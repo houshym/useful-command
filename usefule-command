@@ -1,0 +1,71 @@
+ansible-playbook -vv -i -K ../inventory.yaml ./main.yml --tags management --limit "kube-0" --skip-tags
+
+kibana secret 
+kubectl get secret sky-elastic-es-elastic-user  -n cattle-logging-system  -o go-template='{{.data.elastic | base64decode}}'
+
+#harbor
+curl -sL -o harbor-operator-1.1.0-build.tgz https://github.com/goharbor/harbor-operator/releases/download/v1.1.0/harbor-operator-v1.1.0.tgz
+
+chartmuseum
+helm package stream-manager/
+curl --data-binary "@stream-manager-0.1.0.tgz" http://172.28.12.141:8080/api/charts
+
+curl -X "DELETE" http://172.28.12.141:8080/api/charts/stream-manager/0.1.0
+curl -X DELETE "@stream-manager-0.1.0.tgz" http://192.168.10.113:8080/api/charts/stream-manager/0.1.0
+
+
+
+
+#redis
+kubectl create -f https://raw.githubusercontent.com/spotahome/redis-operator/master/example/operator/all-redis-operator-resources.yaml
+
+
+# postgresql operator
+git clone https://github.com/zalando/postgres-operator.git
+cd postgres-operator
+
+# apply the manifests in the following order
+kubectl create -f manifests/configmap.yaml  # configuration
+kubectl create -f manifests/operator-service-account-rbac.yaml  # identity and permissions
+kubectl create -f manifests/postgres-operator.yaml  # deployment
+kubectl create -f manifests/api-service.yaml  # operator API to be used by UI
+
+
+
+
+
+Deploy harbor manually
+
+
+1- deploy postgress operator
+kubectl apply -k github.com/zalando/postgres-operator/manifests
+2- deploy redis operator
+kubectl create -f https://raw.githubusercontent.com/spotahome/redis-operator/master/example/operator/all-redis-operator-resources.yaml
+3- deploy harbor operator
+kubectl apply -f https://raw.githubusercontent.com/goharbor/harbor-operator/master/manifests/harbor/deployment.yaml
+
+kubectl get secret \
+"$(kubectl get harborcluster harborcluster-sample -n cluster-sample-ns -o jsonpath='{.spec.harborAdminPasswordRef}')" \
+-n cluster-sample-ns \
+-o jsonpath='{.data.secret}' \
+| base64 --decode
+
+
+install herbor helm
+helm install harbor harbor/harbor --set expose.type=loadBalancer \
+--set persistence.persistentVolumeClaim.registry.storageClass=longhorn \
+--set persistence.persistentVolumeClaim.chartmuseum.storageClass=longhorn \
+--set persistence.persistentVolumeClaim.jobservice.storageClass=longhorn \
+--set persistence.persistentVolumeClaim.database.storageClass=longhorn \
+--set persistence.persistentVolumeClaim.redis.storageClass=longhorn \
+--set persistence.persistentVolumeClaim.trivy.storageClass=longhorn \
+--set expose.tls.auto.commonName=core.skylinenet.net
+
+
+fetch certificate
+
+kubeseal --fetch-cert --controller-name=sealed-secrets --controller-namespace=kube-system > pubcert.pem
+
+seal secrets
+kubeseal  --controller-name=sealed-secrets --controller-namespace=kube-system --format=yaml < ts-secret.yml  > ts-sealed-secret.yaml
+
