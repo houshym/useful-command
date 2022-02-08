@@ -1,4 +1,4 @@
-ansible-playbook -vv -i -K ../inventory.yaml ./main.yml --tags management --limit "kube-0" --skip-tags
+ansible-playbook -vv -K -i  ../inventory.yaml ./main.yml --tags management --limit "kube-0" --skip-tags
 
 kibana secret 
 kubectl get secret sky-elastic-es-elastic-user  -n cattle-logging-system  -o go-template='{{.data.elastic | base64decode}}'
